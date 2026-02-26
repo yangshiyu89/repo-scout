@@ -1,0 +1,454 @@
+{
+  "project_info": {
+    "repo_url": "<REPO_URL>",
+    "repo_name": "<REPO_NAME>",
+    "repo_path": "<REPO_PATH>",
+    "model_name": "<MODEL_NAME>",
+    "created_at": "<TIMESTAMP>",
+    "updated_at": "<TIMESTAMP>"
+  },
+  "tasks": [
+    {
+      "id": "task_001",
+      "name": "Clone Repository",
+      "description": "克隆目标仓库到本地",
+      "category": "initialization",
+      "dependencies": [],
+      "command": "git clone <REPO_URL> <REPO_PATH>",
+      "verification": {
+        "type": "directory_exists",
+        "target": "<REPO_PATH>/.git",
+        "description": "验证 .git 目录存在"
+      },
+      "retry": {
+        "max_attempts": 3,
+        "current_attempt": 0
+      },
+      "estimated_time": "1-5 minutes",
+      "priority": "high"
+    },
+    {
+      "id": "task_002",
+      "name": "Analyze Project Dependencies",
+      "description": "分析项目的依赖需求",
+      "category": "analysis",
+      "dependencies": ["task_001"],
+      "command": null,
+      "subtasks": [
+        {
+          "id": "task_002_1",
+          "name": "Read README",
+          "description": "读取 README 了解安装说明",
+          "files_to_check": ["README.md", "README.rst", "README.txt"]
+        },
+        {
+          "id": "task_002_2",
+          "name": "Check dependency files",
+          "description": "检查依赖文件",
+          "files_to_check": ["requirements.txt", "setup.py", "pyproject.toml", "environment.yml"]
+        },
+        {
+          "id": "task_002_3",
+          "name": "Identify Python version",
+          "description": "确定所需的 Python 版本"
+        },
+        {
+          "id": "task_002_4",
+          "name": "Convert conda to uv",
+          "description": "将 conda 命令转换为 uv 方案（如果需要）"
+        }
+      ],
+      "output": {
+        "python_version": null,
+        "package_manager": "uv",
+        "dependencies": [],
+        "special_notes": []
+      },
+      "estimated_time": "1-2 minutes",
+      "priority": "high"
+    },
+    {
+      "id": "task_003",
+      "name": "Create Virtual Environment",
+      "description": "使用 uv 创建虚拟环境",
+      "category": "environment",
+      "dependencies": ["task_002"],
+      "command": "uv venv .venv",
+      "verification": {
+        "type": "directory_exists",
+        "target": "<REPO_PATH>/.venv",
+        "additional_checks": [
+          "test -f <REPO_PATH>/.venv/bin/python",
+          "test -f <REPO_PATH>/.venv/bin/pip"
+        ]
+      },
+      "retry": {
+        "max_attempts": 2,
+        "current_attempt": 0
+      },
+      "estimated_time": "30 seconds",
+      "priority": "high"
+    },
+    {
+      "id": "task_004",
+      "name": "Install Dependencies",
+      "description": "安装项目依赖",
+      "category": "environment",
+      "dependencies": ["task_003"],
+      "command": null,
+      "branches": {
+        "requirements_txt": {
+          "condition": "test -f requirements.txt",
+          "command": "uv pip install -r requirements.txt"
+        },
+        "setup_py": {
+          "condition": "test -f setup.py",
+          "command": "uv pip install -e ."
+        },
+        "pyproject_toml": {
+          "condition": "test -f pyproject.toml",
+          "command": "uv pip install -e ."
+        }
+      },
+      "verification": {
+        "type": "command_success",
+        "description": "验证依赖安装成功",
+        "check_command": "uv pip list | grep -c <EXPECTED_PACKAGE>"
+      },
+      "retry": {
+        "max_attempts": 3,
+        "current_attempt": 0,
+        "on_failure": "uv pip install --resolution lowest-direct -r requirements.txt"
+      },
+      "timeout": 1800,
+      "estimated_time": "5-30 minutes",
+      "priority": "high"
+    },
+    {
+      "id": "task_005",
+      "name": "Install aria2c",
+      "description": "检查并安装 aria2c（模型下载工具）",
+      "category": "prerequisites",
+      "dependencies": [],
+      "parallel_with": ["task_003", "task_004"],
+      "command": "which aria2c || apt-get install -y aria2",
+      "verification": {
+        "type": "command_exists",
+        "target": "aria2c"
+      },
+      "retry": {
+        "max_attempts": 2,
+        "current_attempt": 0
+      },
+      "estimated_time": "1-2 minutes",
+      "priority": "medium"
+    },
+    {
+      "id": "task_006",
+      "name": "Deploy hfd.sh Script",
+      "description": "部署 HuggingFace 下载脚本",
+      "category": "prerequisites",
+      "dependencies": ["task_005"],
+      "command": null,
+      "subtasks": [
+        {
+          "id": "task_006_1",
+          "name": "Create bin directory",
+          "command": "mkdir -p ~/.local/bin"
+        },
+        {
+          "id": "task_006_2",
+          "name": "Copy hfd.sh",
+          "command": "cp <SKILL_PATH>/scripts/hfd.sh ~/.local/bin/hfd.sh"
+        },
+        {
+          "id": "task_006_3",
+          "name": "Make executable",
+          "command": "chmod +x ~/.local/bin/hfd.sh"
+        }
+      ],
+      "verification": {
+        "type": "command_exists",
+        "target": "~/.local/bin/hfd.sh"
+      },
+      "estimated_time": "10 seconds",
+      "priority": "medium"
+    },
+    {
+      "id": "task_007",
+      "name": "Download Model",
+      "description": "下载 AI 模型",
+      "category": "download",
+      "dependencies": ["task_006"],
+      "parallel_with": ["task_004"],
+      "command": null,
+      "download_strategy": {
+        "priority_1": {
+          "name": "User provided model",
+          "condition": "user_has_model == true",
+          "action": "skip",
+          "model_path": "<USER_MODEL_PATH>"
+        },
+        "priority_2": {
+          "name": "ModelScope",
+          "condition": "model_on_modelscope == true",
+          "command": "python -c \"from modelscope import snapshot_download; snapshot_download('<MODEL_NAME>')\"",
+          "requires": "pip install modelscope"
+        },
+        "priority_3": {
+          "name": "HuggingFace Mirror",
+          "condition": "default",
+          "command": "~/.local/bin/hfd.sh <MODEL_NAME> --tool aria2c -x 10"
+        }
+      },
+      "verification": {
+        "type": "model_files_exist",
+        "targets": [
+          "config.json",
+          "pytorch_model.bin",
+          "model.safetensors"
+        ],
+        "min_files_required": 1
+      },
+      "retry": {
+        "max_attempts": 10,
+        "current_attempt": 0,
+        "retry_delay": 30,
+        "exponential_backoff": true,
+        "on_failure_actions": [
+          "检查网络连接",
+          "清理部分下载的文件",
+          "尝试不同的镜像源",
+          "减少并发连接数"
+        ]
+      },
+      "timeout": 7200,
+      "estimated_time": "10-120 minutes",
+      "priority": "high",
+      "resumable": true
+    },
+    {
+      "id": "task_008",
+      "name": "Download Dataset",
+      "description": "下载数据集（如果需要）",
+      "category": "download",
+      "dependencies": ["task_006"],
+      "parallel_with": ["task_007"],
+      "command": "~/.local/bin/hfd.sh <DATASET_NAME> --dataset --tool aria2c -x 10",
+      "optional": true,
+      "verification": {
+        "type": "directory_not_empty",
+        "target": "<DATASET_PATH>"
+      },
+      "retry": {
+        "max_attempts": 10,
+        "current_attempt": 0,
+        "retry_delay": 30
+      },
+      "estimated_time": "5-60 minutes",
+      "priority": "medium",
+      "resumable": true
+    },
+    {
+      "id": "task_009",
+      "name": "Prepare Demo Data",
+      "description": "准备演示数据",
+      "category": "data_preparation",
+      "dependencies": ["task_001"],
+      "command": null,
+      "subtasks": [
+        {
+          "id": "task_009_1",
+          "name": "Check for existing demo data",
+          "description": "检查仓库中的示例数据",
+          "check_paths": ["examples/", "demo/", "assets/", "data/"]
+        },
+        {
+          "id": "task_009_2",
+          "name": "Create demo data",
+          "description": "如果没有现成数据，创建简单测试数据",
+          "condition": "no_existing_data",
+          "action": "create_based_on_model_type"
+        }
+      ],
+      "output": {
+        "data_path": null,
+        "data_type": null,
+        "sample_files": []
+      },
+      "estimated_time": "1-5 minutes",
+      "priority": "medium"
+    },
+    {
+      "id": "task_010",
+      "name": "Detect GPU Configuration",
+      "description": "检测 GPU 配置",
+      "category": "system_check",
+      "dependencies": [],
+      "parallel_with": ["task_003"],
+      "command": null,
+      "subtasks": [
+        {
+          "id": "task_010_1",
+          "name": "Check GPU availability",
+          "command": "nvidia-smi --query-gpu=index,name,memory.total --format=csv"
+        },
+        {
+          "id": "task_010_2",
+          "name": "Check CUDA version",
+          "command": "nvcc --version"
+        }
+      ],
+      "output": {
+        "gpu_available": false,
+        "gpu_count": 0,
+        "gpu_info": [],
+        "cuda_version": null
+      },
+      "estimated_time": "10 seconds",
+      "priority": "medium"
+    },
+    {
+      "id": "task_011",
+      "name": "Find Inference Script",
+      "description": "查找推理脚本",
+      "category": "analysis",
+      "dependencies": ["task_001"],
+      "command": null,
+      "search_strategy": {
+        "common_scripts": ["inference.py", "demo.py", "run.py", "predict.py", "test.py"],
+        "search_paths": [".", "scripts/", "examples/", "demo/"],
+        "pattern_matching": ["*inference*.py", "*demo*.py", "*run*.py"]
+      },
+      "output": {
+        "script_found": false,
+        "script_path": null,
+        "script_type": null,
+        "expected_arguments": []
+      },
+      "estimated_time": "10 seconds",
+      "priority": "high"
+    },
+    {
+      "id": "task_012",
+      "name": "Run Inference",
+      "description": "运行推理",
+      "category": "execution",
+      "dependencies": ["task_004", "task_007", "task_009", "task_011"],
+      "command": null,
+      "dynamic_command": {
+        "template": "python <INFERENCE_SCRIPT> --model <MODEL_PATH> --input <DATA_PATH> --output <OUTPUT_PATH>",
+        "variables": {
+          "INFERENCE_SCRIPT": "from task_011",
+          "MODEL_PATH": "from task_007",
+          "DATA_PATH": "from task_009",
+          "OUTPUT_PATH": ".demo_output/"
+        }
+      },
+      "pre_checks": [
+        "source .venv/bin/activate",
+        "test -f <INFERENCE_SCRIPT>",
+        "test -d <MODEL_PATH> || test -f <MODEL_PATH>"
+      ],
+      "verification": {
+        "type": "output_files_exist",
+        "target": ".demo_output/",
+        "min_files_required": 1
+      },
+      "retry": {
+        "max_attempts": 3,
+        "current_attempt": 0,
+        "on_failure": "检查推理脚本参数和日志"
+      },
+      "timeout": 3600,
+      "estimated_time": "1-60 minutes",
+      "priority": "high"
+    },
+    {
+      "id": "task_013",
+      "name": "Validate Results",
+      "description": "验证推理结果",
+      "category": "validation",
+      "dependencies": ["task_012"],
+      "command": null,
+      "subtasks": [
+        {
+          "id": "task_013_1",
+          "name": "Check output directory",
+          "description": "检查输出目录不为空"
+        },
+        {
+          "id": "task_013_2",
+          "name": "List output files",
+          "description": "列出所有输出文件"
+        },
+        {
+          "id": "task_013_3",
+          "name": "Check file sizes",
+          "description": "检查文件大小合理"
+        }
+      ],
+      "output": {
+        "success": false,
+        "output_files": [],
+        "output_size": null,
+        "errors": []
+      },
+      "estimated_time": "10 seconds",
+      "priority": "high"
+    },
+    {
+      "id": "task_014",
+      "name": "Generate Report",
+      "description": "生成执行报告",
+      "category": "reporting",
+      "dependencies": ["task_013"],
+      "command": null,
+      "output": {
+        "report_path": ".task_manager/EXECUTION_REPORT.md",
+        "sections": [
+          "任务摘要",
+          "执行时间统计",
+          "所有执行的命令",
+          "输出文件列表",
+          "问题和解决方案"
+        ]
+      },
+      "estimated_time": "30 seconds",
+      "priority": "medium"
+    }
+  ],
+  "execution_plan": {
+    "parallel_groups": [
+      {
+        "group_id": "parallel_1",
+        "description": "环境搭建和模型下载并行",
+        "tasks": ["task_003", "task_004", "task_005", "task_006", "task_007"],
+        "strategy": "max_parallel"
+      },
+      {
+        "group_id": "parallel_2",
+        "description": "数据准备和系统检测并行",
+        "tasks": ["task_009", "task_010"],
+        "strategy": "max_parallel"
+      }
+    ],
+    "sequential_groups": [
+      {
+        "group_id": "seq_1",
+        "description": "初始化阶段",
+        "tasks": ["task_001", "task_002"]
+      },
+      {
+        "group_id": "seq_2",
+        "description": "执行阶段",
+        "tasks": ["task_011", "task_012"]
+      },
+      {
+        "group_id": "seq_3",
+        "description": "验证阶段",
+        "tasks": ["task_013", "task_014"]
+      }
+    ]
+  }
+}
