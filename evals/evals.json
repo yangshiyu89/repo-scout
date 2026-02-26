@@ -1,0 +1,44 @@
+{
+  "skill_name": "repo-scout",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我调研一下 https://github.com/AUTOMATIC1111/stable-diffusion-webui 这个项目，我想快速跑个文生图的 demo",
+      "expected_output": "按照 skill 流程：1)询问 clone 目录 2)使用 uv 搭建环境（禁用 conda）3)询问模型是否已下载 4)准备 demo 数据 5)运行推理",
+      "files": [],
+      "expectations": [
+        "询问用户要 clone 到哪个目录",
+        "使用 uv 而非 conda 创建虚拟环境",
+        "询问用户模型是否已下载",
+        "检查是否有推理脚本",
+        "记录执行的命令"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我想快速上手 Whisper 语音识别模型，帮我部署并跑个 demo",
+      "expected_output": "按照 skill 流程调研 OpenAI Whisper，使用 uv 搭建环境，从 ModelScope 或 HuggingFace 下载模型，运行语音识别 demo",
+      "files": [],
+      "expectations": [
+        "询问 GitHub 仓库地址或使用 OpenAI/whisper",
+        "使用 uv venv 创建虚拟环境",
+        "优先询问用户是否已有模型",
+        "如需下载，尝试 ModelScope 或使用 hfd.sh",
+        "检查 aria2c 是否安装（如使用 hfd.sh）",
+        "输出目录使用 .demo_output/"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "这个项目的 README 里说要用 conda create -n myenv python=3.10，帮我换成 uv 的方案并部署",
+      "expected_output": "将 conda 命令转换为 uv 方案：uv venv .venv 替代 conda create，使用 source .venv/bin/activate 激活环境",
+      "files": [],
+      "expectations": [
+        "明确将 conda create 转换为 uv venv",
+        "将 conda install 转换为 uv pip install",
+        "使用 uv pip install -r requirements.txt 安装依赖",
+        "不使用任何 conda 命令"
+      ]
+    }
+  ]
+}
