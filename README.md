@@ -70,7 +70,7 @@ Repo Scout 会自动分析项目的环境需求，并将 conda 命令转换为 u
 
 ```bash
 # 转换示例
-conda create -n myenv python=3.10  →  uv venv .venv
+conda create -n myenv python=3.10  →  uv venv .venv --python 3.10
 conda install pytorch torchvision     →  uv pip install pytorch torchvision
 ```
 

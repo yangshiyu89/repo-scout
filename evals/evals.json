@@ -31,10 +31,10 @@
     {
       "id": 3,
       "prompt": "这个项目的 README 里说要用 conda create -n myenv python=3.10，帮我换成 uv 的方案并部署",
-      "expected_output": "将 conda 命令转换为 uv 方案：uv venv .venv 替代 conda create，使用 source .venv/bin/activate 激活环境",
+      "expected_output": "将 conda 命令转换为 uv 方案：uv venv .venv --python 3.10 替代 conda create -n myenv python=3.10，使用 source .venv/bin/activate 激活环境",
       "files": [],
       "expectations": [
-        "明确将 conda create 转换为 uv venv",
+        "明确将 conda create -n myenv python=3.10 转换为 uv venv .venv --python 3.10",
         "将 conda install 转换为 uv pip install",
         "使用 uv pip install -r requirements.txt 安装依赖",
         "不使用任何 conda 命令"
